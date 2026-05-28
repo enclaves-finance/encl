@@ -1,0 +1,52 @@
+name: test
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+# Cancel in-flight runs for the same PR / branch when a new commit lands.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: compile + typecheck + test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      # Installing the deps also runs the `prepare` script, which compiles
+      # the contracts (auto-generating TypeChain bindings via the hardhat
+      # plugin) and then builds the TypeScript entry point. Doing it here
+      # keeps the subsequent typecheck honest — it sees the real generated
+      # types.
+      #
+      # We use `npm install` rather than `npm ci` because ganache's bundled
+      # `fsevents` shows up in the package-lock as an "extraneous"
+      # darwin-only entry that `npm ci` refuses to skip on Linux. `npm
+      # install` is permissive about that single stray entry while still
+      # honouring the rest of the lockfile.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Lint Solidity
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

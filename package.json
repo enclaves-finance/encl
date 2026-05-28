@@ -1,0 +1,78 @@
+{
+  "name": "@enclaves/encl",
+  "version": "0.1.0",
+  "description": "ENCL — the Enclaves platform utility / bonding token (ERC-20 + ERC-2612 permit, fixed supply).",
+  "license": "GPL-3.0",
+  "homepage": "https://github.com/enclaves-finance/encl#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/enclaves-finance/encl.git"
+  },
+  "bugs": {
+    "url": "https://github.com/enclaves-finance/encl/issues"
+  },
+  "keywords": [
+    "ethereum",
+    "solidity",
+    "erc20",
+    "erc2612",
+    "permit",
+    "rwa",
+    "tokenization",
+    "enclaves"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "contracts/",
+    "artifacts/contracts/",
+    "dist/",
+    "typechain-types/",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "prepare": "npm run compile && npm run build",
+    "build": "tsc -p tsconfig.build.json",
+    "compile": "hardhat compile",
+    "node": "hardhat node --port 8546",
+    "test": "hardhat test",
+    "test:local": "hardhat test --network localhost",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia && npm run verify:sepolia && npm run export:sepolia",
+    "deploy:polygonAmoy": "hardhat run scripts/deploy.ts --network polygonAmoy && npm run verify:polygonAmoy && npm run export:polygonAmoy",
+    "verify:sepolia": "hardhat run scripts/verify-deployment.ts --network sepolia",
+    "verify:polygonAmoy": "hardhat run scripts/verify-deployment.ts --network polygonAmoy",
+    "verify:etherscan": "hardhat verify --network sepolia",
+    "export:sepolia": "hardhat run scripts/export-address.ts --network sepolia",
+    "export:polygonAmoy": "hardhat run scripts/export-address.ts --network polygonAmoy",
+    "console": "hardhat console --network localhost",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "solhint 'contracts/**/*.sol'",
+    "format": "prettier --write 'contracts/**/*.sol' '{scripts,test}/**/*.ts'"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.9",
+    "@nomicfoundation/hardhat-ethers": "^3.0.9",
+    "@nomicfoundation/hardhat-verify": "^2.0.13",
+    "@openzeppelin/contracts": "^4.9.6",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/chai": "^4.3.16",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.14.10",
+    "chai": "^4.4.1",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.16.0",
+    "hardhat": "^2.28.6",
+    "prettier": "^3.3.3",
+    "prettier-plugin-solidity": "^1.3.1",
+    "solhint": "^5.0.3",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.2",
+    "typescript": "^5.5.4"
+  }
+}

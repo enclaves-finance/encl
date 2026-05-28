@@ -1,0 +1,18 @@
+# GitHub Linguist overrides.
+#
+# This is primarily a Solidity project. The TypeScript files here are
+# Hardhat infrastructure — tests, deploy and verify scripts, the config
+# file, and a small consumer-facing artifact loader. They aren't the
+# deliverable; marking them as `linguist-vendored` keeps them fully
+# browsable and searchable, but excludes them from the repo's language
+# bar so the summary reflects what `@enclaves/encl` actually *is*.
+
+*.sol linguist-detectable=true
+
+test/** linguist-vendored=true
+scripts/** linguist-vendored=true
+hardhat.config.ts linguist-vendored=true
+index.ts linguist-vendored=true
+tsconfig.json linguist-vendored=true
+tsconfig.build.json linguist-vendored=true
+typechain-types/** linguist-generated=true
