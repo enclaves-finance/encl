@@ -4,43 +4,51 @@ on:
   push:
     branches: [main, dev]
   pull_request:
-    branches: [main, dev]
+    # Empty `branches:` makes the trigger fire for PRs targeting ANY
+    # branch, which is what we want — required checks live on PR runs,
+    # not push runs.
+    branches:
+  workflow_dispatch:
 
-# Cancel in-flight runs for the same PR / branch when a new commit lands.
+# Least-privilege default. Individual jobs that need more (e.g. to
+# write a coverage comment) opt back in.
+permissions:
+  contents: read
+
+# Cancel in-flight runs for the same PR / branch when a new commit
+# lands.
 concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    name: compile + typecheck + test
+    name: compile + lint + typecheck + test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         node-version: ['20', '22']
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to immutable commit SHAs (not movable tags
+      # like @v4) so that an attacker who compromises an action's repo
+      # cannot silently change what runs in our CI. Dependabot bumps
+      # these as PRs; never auto-merge them.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      # Installing the deps also runs the `prepare` script, which compiles
-      # the contracts (auto-generating TypeChain bindings via the hardhat
-      # plugin) and then builds the TypeScript entry point. Doing it here
-      # keeps the subsequent typecheck honest — it sees the real generated
-      # types.
-      #
-      # We use `npm install` rather than `npm ci` because ganache's bundled
-      # `fsevents` shows up in the package-lock as an "extraneous"
-      # darwin-only entry that `npm ci` refuses to skip on Linux. `npm
-      # install` is permissive about that single stray entry while still
-      # honouring the rest of the lockfile.
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      # `npm ci` insists the install be byte-for-byte the lockfile, so
+      # any drift fails the build instead of silently mutating
+      # node_modules. Running the prepare/compile/build chain here
+      # keeps the subsequent typecheck honest: it sees the real
+      # generated types.
+      - name: Install dependencies (frozen lockfile)
+        run: npm ci --no-audit --no-fund
 
       - name: Lint Solidity
         run: npm run lint
@@ -50,3 +58,63 @@ jobs:
 
       - name: Test
         run: npm test
+
+  coverage:
+    name: coverage (≥95% lines / ≥90% branches)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies (frozen lockfile)
+        run: npm ci --no-audit --no-fund
+
+      - name: Run solidity-coverage
+        run: npm run coverage
+
+      # Floor is currently set well below the real numbers so a single
+      # uncovered new line doesn't break the world; we ratchet these
+      # up over time and never lower them silently.
+      - name: Enforce coverage floor
+        run: |
+          node -e "
+            const c = require('./coverage/coverage-summary.json').total;
+            const floors = { lines: 95, statements: 95, functions: 95, branches: 90 };
+            let bad = false;
+            for (const [k, min] of Object.entries(floors)) {
+              const v = c[k].pct;
+              const ok = v >= min;
+              console.log(\`\${ok ? 'OK  ' : 'FAIL'} \${k}: \${v}% (floor \${min}%)\`);
+              if (!ok) bad = true;
+            }
+            if (bad) process.exit(1);
+          "
+
+  slither:
+    name: slither
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies (frozen lockfile)
+        run: npm ci --no-audit --no-fund
+
+      # Slither runs the compile step itself; we still install above so
+      # its hardhat-compile path can resolve our deps.
+      - name: Run Slither
+        uses: crytic/slither-action@b52cc1cbfee9ca3e8722dd5224299d16c9a6b80f # v0.4.2
+        with:
+          slither-config: slither.config.json
+          # TODO: ratchet to `medium` once the initial findings have
+          # been triaged. `high` is the conservative starting floor —
+          # any high-severity finding blocks the merge.
+          fail-on: high
